@@ -1,3 +1,6 @@
+#dns-response-replacer-js
+cache/
+
 # Logs
 logs
 *.log

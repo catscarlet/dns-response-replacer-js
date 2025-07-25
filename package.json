@@ -1,0 +1,26 @@
+{
+  "name": "dns-response-replacer-js",
+  "version": "0.0.1",
+  "description": "dns-response-replacer",
+  "main": "dns-response-replacer-js.js",
+  "dependencies": {
+    "dns-packet": "^5.6.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "node dns-response-replacer-js.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/catscarlet/dns-response-replacer-js.git"
+  },
+  "keywords": [
+    "cloudflare"
+  ],
+  "author": "catscarlet",
+  "license": "AGPL-3.0",
+  "bugs": {
+    "url": "https://github.com/catscarlet/dns-response-replacer-js/issues"
+  },
+  "homepage": "https://github.com/catscarlet/dns-response-replacer-js#readme"
+}
