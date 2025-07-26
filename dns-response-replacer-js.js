@@ -343,6 +343,7 @@ const handleQuery = async (message, rinfo) => {
     } catch (err) {
         console.error(`[ERROR] ${err.message}`);
 
+        /*
         const errorResponse = {
             type: 'response',
             id: dnsPacket.decode(message).id,
@@ -352,6 +353,7 @@ const handleQuery = async (message, rinfo) => {
 
         const errorBuffer = dnsPacket.encode(errorResponse);
         server.send(errorBuffer, 0, errorBuffer.length, rinfo.port, rinfo.address);
+        */
     }
 };
 
