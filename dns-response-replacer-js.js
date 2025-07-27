@@ -1,6 +1,7 @@
 const dgram = require('dgram');
 const dnsPacket = require('dns-packet');
 const {promisify} = require('util');
+const net = require('net');
 
 const fs = require('fs');
 const path = require('path');
@@ -25,7 +26,7 @@ const CONFIG = {
 
 CONFIG.upstreamServers = upstreamServers;
 
-const server = dgram.createSocket('udp4');
+const udpServer = dgram.createSocket('udp4');
 
 const RECORD_TYPES = {
     1: 'A',
@@ -83,22 +84,22 @@ function getCloudflareIpv6List() {
 function getUpstreamServers() {
     const serverlist = getContentFromListFile('dns-servers.list');
 
-    let servers = [];
+    let nameservers = [];
     serverlist.forEach((item, i) => {
 
         if (ipToInt(item) !== null) {
-            let server = {
+            let serverItem = {
                 host: item,
                 port: 53,
             };
-            servers.push(server);
+            nameservers.push(serverItem);
         }
 
     });
 
-    console.log('get UpstreamServers: ' + servers.length);
-    console.log(servers);
-    return servers;
+    console.log('get UpstreamServers: ' + nameservers.length);
+    console.log(nameservers);
+    return nameservers;
 
 };
 
@@ -136,7 +137,7 @@ function getCloudflareIpv6CfstList() {
 
 console.log(CONFIG);
 
-const queryUpstream = (packet, upstream) => {
+function queryUpstream(packet, upstream) {
     return new Promise((resolve, reject) => {
         const socket = dgram.createSocket('udp4');
         const buffer = dnsPacket.encode(packet);
@@ -175,7 +176,7 @@ const queryUpstream = (packet, upstream) => {
     });
 };
 
-const handleQuery = async (message, rinfo) => {
+async function handleQuery(message, rinfo) {
     try {
         const request = dnsPacket.decode(message);
 
@@ -331,7 +332,7 @@ const handleQuery = async (message, rinfo) => {
 
         const responseBuffer = dnsPacket.encode(response);
 
-        server.send(responseBuffer, 0, responseBuffer.length, rinfo.port, rinfo.address, (err) => {
+        udpServer.send(responseBuffer, 0, responseBuffer.length, rinfo.port, rinfo.address, (err) => {
             if (err) {
                 console.error(`[SEND ERROR] ${err.message}`);
             } else if (response.answers && response.answers.length > 0) {
@@ -352,7 +353,7 @@ const handleQuery = async (message, rinfo) => {
         };
 
         const errorBuffer = dnsPacket.encode(errorResponse);
-        server.send(errorBuffer, 0, errorBuffer.length, rinfo.port, rinfo.address);
+        udpServer.send(errorBuffer, 0, errorBuffer.length, rinfo.port, rinfo.address);
         */
     }
 };
@@ -545,26 +546,136 @@ function loadReplacedCache() {
     }
 }
 
-server.on('message', handleQuery);
+udpServer.on('message', handleQuery);
 
-server.on('listening', () => {
-    const address = server.address();
-    console.log(`DNS server listening on ${address.address}:${address.port}`);
+udpServer.on('listening', () => {
+    const address = udpServer.address();
+    console.log(`DNS over UDP Server listening on ${address.address}:${address.port}`);
     console.log(`Upstream DNS servers: ${CONFIG.upstreamServers.map(s => `${s.host}:${s.port}`).join(', ')}`);
     console.log('Supported record types:', Object.values(RECORD_TYPES).join(', '));
 });
 
-server.on('error', (err) => {
-    console.error(`Server error: ${err.message}`);
-    server.close();
+udpServer.on('error', (err) => {
+    console.error(`udpServer error: ${err.message}`);
+    udpServer.close();
 });
 
-server.bind(CONFIG.port, CONFIG.host);
+udpServer.bind(CONFIG.port, CONFIG.host);
 
 process.on('SIGINT', () => {
-    console.log('Shutting down DNS server...');
-    server.close(() => {
-        console.log('DNS server stopped');
+    console.log('Shutting down DNS udpServer...');
+    udpServer.close(() => {
+        console.log('DNS udpServer stopped');
         process.exit(0);
     });
+});
+
+const tcpServer = net.createServer((tcpSocket) => {
+    const clientAddress = `${tcpSocket.remoteAddress}:${tcpSocket.remotePort}`;
+
+    let buffer = Buffer.alloc(0);
+
+    tcpSocket.on('data', (data) => {
+        buffer = Buffer.concat([buffer, data]);
+
+        // DNS over TCP的消息前有2字节表示长度
+        while (buffer.length >= 2) {
+            const length = buffer.readUInt16BE(0);
+
+            if (buffer.length >= length + 2) {
+                const message = buffer.slice(2, length + 2);
+                buffer = buffer.slice(length + 2);
+
+                // 处理DNS请求
+                handleTcpRequest(message, tcpSocket, clientAddress);
+            } else {
+                // 数据不完整，等待更多数据
+                break;
+            }
+        }
+    });
+
+    tcpSocket.on('end', () => {
+    });
+
+    tcpSocket.on('error', (err) => {
+        console.error(`[TCP] 连接 ${clientAddress} 错误:`, err);
+    });
+});
+
+async function handleTcpRequest(message, tcpSocket, clientAddress) {
+    try {
+        const request = dnsPacket.decode(message);
+
+        const response = await forwardDnsRequestTcp(request);
+
+        // DNS over TCP的响应前需要添加2字节的长度
+        const lengthBuffer = Buffer.alloc(2);
+        lengthBuffer.writeUInt16BE(response.length, 0);
+        const responseWithLength = Buffer.concat([lengthBuffer, response]);
+
+        tcpSocket.write(responseWithLength, () => {
+        });
+    } catch (err) {
+        console.error(`[TCP] 处理 ${clientAddress} 请求错误:`, err);
+        tcpSocket.end();
+    }
+}
+
+function forwardDnsRequestTcp(request) {
+    return new Promise((resolve, reject) => {
+        let nameserver = upstreamServers[0];
+        const socket = net.createConnection(nameserver, () => {
+            const requestBuffer = dnsPacket.encode(request);
+
+            // DNS over TCP的请求前需要添加2字节的长度
+            const lengthBuffer = Buffer.alloc(2);
+            lengthBuffer.writeUInt16BE(requestBuffer.length, 0);
+            const requestWithLength = Buffer.concat([lengthBuffer, requestBuffer]);
+
+            socket.write(requestWithLength);
+        });
+
+        let buffer = Buffer.alloc(0);
+
+        socket.on('data', (data) => {
+            buffer = Buffer.concat([buffer, data]);
+
+            // 检查是否接收到完整的响应
+            while (buffer.length >= 2) {
+                const length = buffer.readUInt16BE(0);
+
+                if (buffer.length >= length + 2) {
+                    const responseBuffer = buffer.slice(2, length + 2);
+                    socket.destroy();
+                    resolve(responseBuffer);
+                    return;
+                } else {
+                    // 数据不完整，等待更多数据
+                    break;
+                }
+            }
+        });
+
+        socket.on('error', (err) => {
+            reject(err);
+        });
+
+        socket.on('timeout', () => {
+            socket.destroy();
+            reject(new Error('DNS请求超时 (TCP)'));
+        });
+
+        socket.setTimeout(CONFIG.timeout);
+    });
+}
+
+
+tcpServer.listen(CONFIG.port, () => {
+    console.log(`DNS over TCP Server listening on ${CONFIG.port}`);
+});
+
+tcpServer.on('error', (err) => {
+    console.error(`[TCP] 服务器错误:`, err);
+    tcpServer.close();
 });
