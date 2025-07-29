@@ -137,7 +137,7 @@ function getCloudflareIpv6CfstList() {
 
 console.log(CONFIG);
 
-function queryUpstream(packet, upstream) {
+function forwardDnsRequestUdp(packet, upstream) {
     return new Promise((resolve, reject) => {
         const socket = dgram.createSocket('udp4');
         const buffer = dnsPacket.encode(packet);
@@ -176,35 +176,35 @@ function queryUpstream(packet, upstream) {
     });
 };
 
-async function handleQuery(message, rinfo) {
+async function handleUdpQuery(message, rinfo) {
     try {
         const request = dnsPacket.decode(message);
 
         if (request.questions && request.questions.length > 0) {
             const question = request.questions[0];
             const type = RECORD_TYPES[question.type] || question.type;
+
             //console.log(`[QUERY] ${question.name} (${type}) from ${rinfo.address}:${rinfo.port}`);
         }
 
         let response;
         let lastError;
-        let resopnseServer;
 
         for (let i = 0; i < CONFIG.upstreamServers.length; i++) {
             const upstream = CONFIG.upstreamServers[i];
 
             try {
-                response = await queryUpstream(request, upstream);
+                response = await forwardDnsRequestUdp(request, upstream);
                 lastError = null;
                 break;
             } catch (err) {
                 lastError = err;
-                console.error(`[UPSTREAM ERROR] ${upstream.host}:${upstream.port} - ${err.message}`);
+                console.error(`[UDP UPSTREAM ERROR] ${upstream.host}:${upstream.port} - ${err.message}`);
 
                 for (let retry = 0; retry < CONFIG.retryCount; retry++) {
                     try {
                         console.log(`[RETRY] ${retry + 1}/${CONFIG.retryCount} to ${upstream.host}:${upstream.port}`);
-                        response = await queryUpstream(request, upstream);
+                        response = await forwardDnsRequestUdp(request, upstream);
                         lastError = null;
                         break;
                     } catch (retryErr) {
@@ -546,7 +546,7 @@ function loadReplacedCache() {
     }
 }
 
-udpServer.on('message', handleQuery);
+udpServer.on('message', handleUdpQuery);
 
 udpServer.on('listening', () => {
     const address = udpServer.address();
@@ -587,7 +587,7 @@ const tcpServer = net.createServer((tcpSocket) => {
                 buffer = buffer.slice(length + 2);
 
                 // 处理DNS请求
-                handleTcpRequest(message, tcpSocket, clientAddress);
+                handleTcpQuery(message, tcpSocket, clientAddress);
             } else {
                 // 数据不完整，等待更多数据
                 break;
@@ -603,11 +603,38 @@ const tcpServer = net.createServer((tcpSocket) => {
     });
 });
 
-async function handleTcpRequest(message, tcpSocket, clientAddress) {
+async function handleTcpQuery(message, tcpSocket, clientAddress) {
     try {
         const request = dnsPacket.decode(message);
+        let response;
+        let lastError;
+        for (let i = 0; i < CONFIG.upstreamServers.length; i++) {
+            const upstream = CONFIG.upstreamServers[i];
 
-        const response = await forwardDnsRequestTcp(request);
+            try {
+                response = await forwardDnsRequestTcp(request, upstream);
+                lastError = null;
+                break;
+            } catch (err) {
+                lastError = err;
+                console.error(`[TCP UPSTREAM ERROR] ${upstream.host}:${upstream.port} - ${err.message}`);
+
+                for (let retry = 0; retry < CONFIG.retryCount; retry++) {
+                    try {
+                        console.log(`[RETRY] ${retry + 1}/${CONFIG.retryCount} to ${upstream.host}:${upstream.port}`);
+                        response = await forwardDnsRequestUdp(request, upstream);
+                        lastError = null;
+                        break;
+                    } catch (retryErr) {
+                        lastError = retryErr;
+                    }
+                }
+
+                if (response) {
+                    break;
+                }
+            }
+        }
 
         // DNS over TCP的响应前需要添加2字节的长度
         const lengthBuffer = Buffer.alloc(2);
@@ -622,10 +649,9 @@ async function handleTcpRequest(message, tcpSocket, clientAddress) {
     }
 }
 
-function forwardDnsRequestTcp(request) {
+function forwardDnsRequestTcp(request, upstream) {
     return new Promise((resolve, reject) => {
-        let nameserver = upstreamServers[0];
-        const socket = net.createConnection(nameserver, () => {
+        const socket = net.createConnection(upstream, () => {
             const requestBuffer = dnsPacket.encode(request);
 
             // DNS over TCP的请求前需要添加2字节的长度
