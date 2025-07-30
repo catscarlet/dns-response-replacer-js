@@ -320,14 +320,13 @@ async function handleUdpQuery(message, rinfo) {
             response.originalAnswers = tempAnswers;
 
             if (newCache) {
-                console.log('saving cache for: ' + '\x1b[32m' + name + '\x1b[0m' + ', return ' + '\x1b[36m' + 'replaced' + '\x1b[0m' + ' answer: ' + '\x1b[32m' + JSON.stringify(response.answers) + '\x1b[0m');
+                console.log('saving ' + type + ' cache for: ' + '\x1b[32m' + name + '\x1b[0m' + ', return ' + '\x1b[36m' + 'replaced' + '\x1b[0m' + ' answer: ' + '\x1b[32m' + JSON.stringify(response.answers) + '\x1b[0m' + ' to ' + '\x1b[35m' + rinfo.address + '\x1b[0m');
                 saveReplacedCache(type, name, newAnswers);
             } else {
-                console.log('hit cache: ' + '\x1b[32m' + name + '\x1b[0m' + ', return ' + '\x1b[34m' + 'cached' + '\x1b[0m' + ' answer: ' + '\x1b[32m' + JSON.stringify(response.answers) + '\x1b[0m');
+                console.log('hit ' + type + ' cache: ' + '\x1b[32m' + name + '\x1b[0m' + ', return ' + '\x1b[34m' + 'cached' + '\x1b[0m' + ' answer: ' + '\x1b[32m' + JSON.stringify(response.answers) + '\x1b[0m' + ' to ' + '\x1b[35m' + rinfo.address + '\x1b[0m');
             }
         } else {
-            //console.log('not a cloudflare ip: ' + name + ', return original answer: ' + JSON.stringify(response.answers));
-            //console.log('not a cloudflare ip: ' + '\x1b[32m' + name + '\x1b[0m');
+            console.log('not a cloudflare ' + type + ' query: ' + '\x1b[32m' + name + '\x1b[0m' + ', return original answer from upstream: ' + '\x1b[33m' + response.upstream.host + '\x1b[0m' + ' to ' + '\x1b[35m' + rinfo.address + '\x1b[0m');
         }
 
         const responseBuffer = dnsPacket.encode(response);
