@@ -8,7 +8,7 @@
 
 本工具本质上是一个 **域名伺服器（Name server）** 。用户需要在网络设置中配置DNS地址为本服务地址。
 
-当进行DNS查询时，假如工具检测到上游返回的查询结果中包含 Cloudflare IP 地址时，将 DNS 查询结果替换为用户指定的 IP 地址。
+当进行DNS查询时，当工具检测到上游返回的查询结果中包含 Cloudflare IP 地址时，将 DNS 查询结果替换为用户指定的 IP 地址。
 
 ![screenshot-ipv4](screenshot-ipv4.png)
 
@@ -52,6 +52,7 @@
 - 重新启动本服务
 
 ------
+
 ## 声明
 
 - 本项目基本由 Node 和 Javascript 编写，性能有限。
@@ -63,7 +64,18 @@
 
 ## To-Do
 
-（TBD）
+- 支持 *DNS over TCP* 时的结果替换
+- 更好的上游DNS查询方式（目前严重依赖配置文件中的第一条DNS服务器）
+- 更好的本地缓存方式（目前使用的是同步保存到json文件）
+- 支持 *DNS over TLS*
+- 支持 *DNS over HTTPS*
+- 支持 *SVCB/HTTPS*
+- 热重载配置文件
+- 支持其他 CDN 的解析替换
+- 实现 Docker 部署
+- 实现 Windows 服务
+- 实现 Linux 服务
+- 实现 Openwrt 服务
 
 ------
 
