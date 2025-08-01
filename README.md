@@ -62,6 +62,13 @@
 
 ------
 
+## 已知问题
+
+- 目前 Cloudflare 官方提供的 [IP地址范围/IP Ranges] 并不是 100% 正确的，有很多IP地址并不属于 Cloudflare，而是由其他公司或组织在使用（参考[bgp.he.net/AS13335](https://bgp.he.net/AS13335#_prefixes)）。如果遇到解析结果包含在 Cloudflare 官方提供的地址范围但实际所属并不是 Cloudflare CDN，会导致对应的域名无法访问。
+- 部分 Cloudflare 的高级客户可能有自己独立的IP段，这些网站无法使用其他IP进行访问。
+
+------
+
 ## To-Do
 
 - 支持 *DNS over TCP* 时的结果替换
@@ -76,6 +83,8 @@
 - 实现 Windows 服务
 - 实现 Linux 服务
 - 实现 Openwrt 服务
+- 实现域名黑名单功能
+- 实现IP黑名单功能
 
 ------
 
