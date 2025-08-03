@@ -6,6 +6,9 @@ const net = require('net');
 const fs = require('fs');
 const path = require('path');
 
+const schedule = require('node-schedule');
+const getSystemDnsServers = require('./libs/get-dns-servers.js');
+
 let replacedCache = loadReplacedCache();
 
 const cloudflareIpv4List = getCloudflareIpv4List();
@@ -22,6 +25,11 @@ const CONFIG = {
     host: '0.0.0.0',
     timeout: 5000,
     retryCount: 2,
+};
+
+const LOGCONFIG = {
+    //minute: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55],
+    second: 0,
 };
 
 CONFIG.upstreamServers = upstreamServers;
@@ -42,6 +50,25 @@ const RECORD_TYPES = {
     43: 'DS',
     48: 'DNSKEY',
 };
+
+const rule = new schedule.RecurrenceRule();
+
+const logJob = schedule.scheduleJob(rule, logMessage);
+
+function logMessage() {
+    const now = new Date();
+    console.log(`[${now.toISOString()}] Schedule log:`);
+    printDnsInfo();
+}
+
+async function printDnsInfo() {
+    try {
+        const dnsInfo = await getSystemDnsServers.getDnsServers();
+        console.log('System DNS currently in use:', dnsInfo);
+    } catch (err) {
+        console.error('错误:', err);
+    }
+}
 
 function getContentFromListFile(filepath) {
     try {
@@ -560,8 +587,10 @@ udpServer.on('error', (err) => {
 });
 
 udpServer.bind(CONFIG.port, CONFIG.host);
+printDnsInfo();
 
 process.on('SIGINT', () => {
+    logJob.cancel();
     console.log('Shutting down DNS udpServer...');
     udpServer.close(() => {
         console.log('DNS udpServer stopped');

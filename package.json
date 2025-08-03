@@ -4,7 +4,8 @@
   "description": "dns-response-replacer",
   "main": "dns-response-replacer-js.js",
   "dependencies": {
-    "dns-packet": "^5.6.1"
+    "dns-packet": "^5.6.1",
+    "node-schedule": "^2.1.1"
   },
   "devDependencies": {},
   "scripts": {
