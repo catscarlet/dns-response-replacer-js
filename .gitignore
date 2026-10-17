@@ -1,5 +1,6 @@
 #dns-response-replacer-js
 cache/
+*.xcf
 
 # Logs
 logs
