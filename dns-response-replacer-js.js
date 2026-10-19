@@ -1,6 +1,5 @@
 const dgram = require('dgram');
 const dnsPacket = require('dns-packet');
-const {promisify} = require('util');
 const net = require('net');
 
 const fs = require('fs');
@@ -12,7 +11,6 @@ const getSystemDnsServers = require('./libs/get-dns-servers.js');
 let replacedCache = loadReplacedCache();
 
 const cloudflareIpv4List = getCloudflareIpv4List();
-
 const cloudflareIpv6List = getCloudflareIpv6List();
 
 const upstreamServers = getUpstreamServers();
@@ -127,7 +125,6 @@ function getUpstreamServers() {
     console.log('get UpstreamServers: ' + nameservers.length);
     console.log(nameservers);
     return nameservers;
-
 };
 
 function getCloudflareIpv4CfstList() {
@@ -396,6 +393,7 @@ function ipToInt(ip) {
         }
         result = (result << 8) | octet;
     }
+
     return result >>> 0;
 }
 
