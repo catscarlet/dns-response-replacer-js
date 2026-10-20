@@ -23,6 +23,7 @@ const CONFIG = {
     host: '0.0.0.0',
     timeout: 5000,
     retryCount: 2,
+    disableIPV6: false,
 };
 
 const LOGCONFIG = {
@@ -307,6 +308,16 @@ async function handleUdpQuery(message, rinfo) {
 
                 if (isCloudflareIPv6IP) {
                     let tmp = cloudflareIpv6CfstList;
+
+                    if (CONFIG.disableIPV6 == true) {
+
+                        let tempAnswers = response.answers;
+                        response.answers = [];
+                        response.originalAnswers = tempAnswers;
+
+                        break;
+                    }
+
                     for (let i = cloudflareIpv6CfstList.length - 1; i > 0; i--) {
                         const j = Math.floor(Math.random() * (i + 1));
 
@@ -349,6 +360,8 @@ async function handleUdpQuery(message, rinfo) {
             } else {
                 console.log('hit ' + type + ' cache: ' + '\x1b[32m' + name + '\x1b[0m' + ', return ' + '\x1b[34m' + 'cached' + '\x1b[0m' + ' answer: ' + '\x1b[32m' + JSON.stringify(response.answers) + '\x1b[0m' + ' to ' + '\x1b[35m' + rinfo.address + '\x1b[0m');
             }
+        } else if (CONFIG.disableIPV6 == true && response.originalAnswers) {
+            console.log('type ' + type + ' query: ' + '\x1b[32m' + name + '\x1b[0m' + ', return ' + '\x1b[34m' + 'empty' + '\x1b[0m' + ' answer: ' + '\x1b[32m' + JSON.stringify(response.answers) + '\x1b[0m' + ' to ' + '\x1b[35m' + rinfo.address + '\x1b[0m');
         } else {
             console.log('not a cloudflare ' + type + ' query: ' + '\x1b[32m' + name + '\x1b[0m' + ', return original answer from upstream: ' + '\x1b[33m' + response.upstream.host + '\x1b[0m' + ' to ' + '\x1b[35m' + rinfo.address + '\x1b[0m');
         }
@@ -412,6 +425,7 @@ function isIpInCidr(ip, cidr) {
 
     const mask = prefixLength === 0 ? 0 : 0xFFFFFFFF << (32 - prefixLength);
     const network = cidrIpInt & mask;
+
     return (ipInt & mask) === network;
 }
 
